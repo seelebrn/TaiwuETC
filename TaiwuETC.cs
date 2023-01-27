@@ -1,6 +1,8 @@
 using BepInEx;
 using Config;
 using GameData.Domains.Character;
+using GameData.Domains.Global;
+using GameData.Domains.TaiwuEvent.DisplayEvent;
 using HarmonyLib;
 using System;
 using System.Collections;
@@ -14,20 +16,19 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Experimental.PlayerLoop;
-using TaiwuModdingLib;
-using TaiwuModdingLib.Core.Plugin;
+
 
 namespace TaiwuETC
 {
-    [PluginConfig("TaiwuETC", "Taiwu Mods Community", "0.1.0")]
-    public class Main : TaiwuRemakeHarmonyPlugin
+    [BepInPlugin("TaiwuETC", "Taiwu Mods Community", "0.1.0")]
+    public class Main : BaseUnityPlugin
     {
         public static Dictionary<string, string> translationDict;
         public static Dictionary<string, string> NamesDict;
         public static Dictionary<string, string> SurnamesDict;
         public static List<string> MissingNames = new List<string>();
         public static List<string> MissingSurnames = new List<string>();
-        public static string translationpath = Path.Combine("Mod", "TaiwuETC", "Plugins", "Translations");
+        public static string translationpath = Path.Combine(BepInEx.Paths.PluginPath, "TaiwuETC", "Translations");
 
         public static Dictionary<string, string> FileToDictionary(string dir)
         {
@@ -35,7 +36,7 @@ namespace TaiwuETC
 
             Dictionary<string, string> dict = new Dictionary<string, string>();
 
-            IEnumerable<string> lines = File.ReadLines(Path.Combine("Mod", "TaiwuETC", "Plugins", "Translations", dir));
+            IEnumerable<string> lines = File.ReadLines(Path.Combine(BepInEx.Paths.PluginPath, "TaiwuETC", "Translations", dir));
 
             foreach (string line in lines)
             {
@@ -60,16 +61,14 @@ namespace TaiwuETC
         }
 
 
-        public override void OnModSettingUpdate()
-        {
-            base.OnModSettingUpdate();
-        }
 
-        public override void Initialize()
+
+        public void Awake()
         {
+
             try
             {
-
+                Debug.Log(Path.Combine(Paths.GameRootPath, "Languages", "en"));
                 SurnamesDict = FileToDictionary("Surnames.txt");
                 NamesDict = FileToDictionary("Names.txt");
                 translationDict = SurnamesDict.MergeLeft(NamesDict);
@@ -82,49 +81,73 @@ namespace TaiwuETC
                 Debug.LogException(e);
             }
             Debug.Log("!!!!! Taiwu ETC loaded");
-            this.OnModSettingUpdate();
+
             Harmony harmony = new Harmony("TaiwuETC.Taiwu Mods Community.0.1.0");
             harmony.PatchAll();
         }
 
-        public void Awake()
-        {
-            //Preparing FailedRegistry.txt - Step 1
-
-           
-
-           
-
-        }
         private void Update()
+
         {
-            if(Input.GetKeyUp(KeyCode.F11))
+            if (Input.GetKeyUp(KeyCode.F11))
             {
-                File.WriteAllText(Path.Combine(translationpath, "MissingNames.txt"), String.Empty);
-                File.WriteAllText(Path.Combine(translationpath, "MissingSurnames.txt"), String.Empty);
-                    foreach (string s in MissingNames.Distinct())
-                    {
-                    using (StreamWriter sw = File.AppendText(Path.Combine(translationpath, "MissingNames.txt")))
+                File.WriteAllText(Path.Combine(Main.translationpath, "MissingNames.txt"), String.Empty);
+                File.WriteAllText(Path.Combine(Main.translationpath, "MissingSurnames.txt"), String.Empty);
+                foreach (string s in Main.MissingNames.Distinct())
+                {
+                    using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingNames.txt")))
                         if (Helpers.IsChinese(s))
                         {
                             sw.Write(s);
                         }
                 }
-                foreach(string s in MissingSurnames.Distinct())
+                foreach (string s in Main.MissingSurnames.Distinct())
                 {
-                    using (StreamWriter sw = File.AppendText(Path.Combine(translationpath, "MissingSurnames.txt")))
+                    using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingSurnames.txt")))
                     {
-                        if(Helpers.IsChinese(s))
-                        { 
-                        sw.Write(s);
+                        if (Helpers.IsChinese(s))
+                        {
+                            sw.Write(s);
                         }
                     }
                 }
-                
+
+            }
+
+            if (Input.GetKeyUp(KeyCode.F10))
+            {
+                File.WriteAllText("EventOptionTips_CN.txt", String.Empty);
+
+                string[] hello = new string[] { };
+                string optionAvailableLanguageFileName = "EventOptionTips_" + LocalStringManager.CurLanguageKey;
+                string filePath = Path.Combine("RemakeResources/Data/Language_EventOptionTips", optionAvailableLanguageFileName);
+                ResLoader.Load<TextAsset>(filePath, delegate (TextAsset asset)
+                {
+                    hello = asset.text.Split(new char[]
+                    {
+                '\n'
+                    });
+                }, null);
+
+
+                using (StreamWriter sw = File.AppendText(Path.Combine(BepInEx.Paths.GameRootPath, "EventOptionTips_CN.txt")))
+                {
+                    for (int i = 0; i < hello.Count(); i++)
+                    {
+                        if (!string.IsNullOrEmpty(hello[i]))
+                        {
+                            sw.Write(hello[i] + "\n");
+                        }
+                    }
+
+                    sw.Close();
+                }
+
             }
         }
+
     }
-        
+
     /*
     [HarmonyPatch(typeof(MonasticTitleItem), "MonasticTitleItem")]
     static class Patch01
@@ -134,6 +157,7 @@ namespace TaiwuETC
             Debug.Log(__instance.Name);
         }
     }*/
+
     [HarmonyPatch(typeof(LocalMonasticTitles), "Init")]
 
     static class LocalMonasticTitles_Patch
@@ -466,7 +490,7 @@ namespace TaiwuETC
     }
 
 
-    [HarmonyPatch(typeof(LocalStringManager), "Get", new Type[] { typeof(ushort)})]
+    /*[HarmonyPatch(typeof(LocalStringManager), "Get", new Type[] { typeof(ushort)})]
     static class FullName_Patch
     {
         static void Postfix(LocalStringManager __instance, ref ushort id, ref string __result)
@@ -476,7 +500,7 @@ namespace TaiwuETC
                 __result = "Taiwu ";
             }
         }
-    }
+    }*/
     /*[HarmonyPatch(typeof(NameCenter), "GetMonasticTitleOrName")]
     static class NameCenter_Patch_01
     {
@@ -520,6 +544,72 @@ namespace TaiwuETC
         }
     }
 
+    [HarmonyPatch(typeof(WorldInfo), "Deserialize")]
+    static class WorldInfo_GetSerializedSize_Patch
+    {
+        static void Postfix(WorldInfo __instance)
+        {
+            Debug.Log("TGN before = " +__instance.TaiwuGivenName);
+            __instance.TaiwuGivenName = " " + __instance.TaiwuGivenName;
+            Debug.Log("TGN after = " + __instance.TaiwuGivenName);
+        }
+    }
+
+    [HarmonyPatch(typeof(EventModel), "GetOptionConditionContent")]
+    static class EventModel_Patch
+    {
+
+    static void Postfix(EventModel __instance, ref string __result, ref short index)
+        {
+            string[] hello = new string[]{};
+            string optionAvailableLanguageFileName = "EventOptionTips_" + LocalStringManager.CurLanguageKey;
+            var lines  = File.ReadAllLines(Path.Combine(Paths.GameRootPath, "Languages", "en", "EventOptionTips_CN.txt"));
+            string filePath = Path.Combine("RemakeResources/Data/Language_EventOptionTips", optionAvailableLanguageFileName);
+            ResLoader.Load<TextAsset>(filePath, delegate (TextAsset asset)
+            {
+                hello = asset.text.Split(new char[]
+                {
+                '\n'
+                });
+            }, null);
+
+
+
+            if(hello.Count() == lines.Count() + 1)
+            {
+                for(int i = 0; i< lines.Count(); i++)
+                {
+                    if(__result == hello[i])
+                    {
+                        Debug.Log("Original String = " + __result);
+                        __result = lines[i];
+                        Debug.Log("Updated Line = " + __result);
+                    }
+                }
+            }
+
+
+        }
+    }
+    [HarmonyPatch(typeof(EventInputRequestData), "Deserialize")]
+    static class EventInputRequestData_Deserialize_Patch
+    {
+        static void Postfix(EventInputRequestData __instance)
+        {
+
+            __instance.NumberRange[1] = __instance.NumberRange[1] + 6;
+
+        }
+    }
+    [HarmonyPatch(typeof(TMP_InputField), "characterLimit", MethodType.Getter)]
+    static class TMP_InputField_characterLimit_Patch
+    {
+        static void Postfix(TMP_InputField __instance, ref int __result)
+        {
+
+            __result = __result + 6;
+        }
+    }
     public static class DictionaryExtensions
     {
 
