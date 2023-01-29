@@ -1,6 +1,7 @@
 using BepInEx;
 using Config;
 using GameData.Domains.Character;
+using GameData.Domains.Character.Display;
 using GameData.Domains.Global;
 using GameData.Domains.TaiwuEvent.DisplayEvent;
 using HarmonyLib;
@@ -26,8 +27,10 @@ namespace TaiwuETC
         public static Dictionary<string, string> translationDict;
         public static Dictionary<string, string> NamesDict;
         public static Dictionary<string, string> SurnamesDict;
+        public static Dictionary<string, string> LocalMonasticTitlesDict;
         public static List<string> MissingNames = new List<string>();
         public static List<string> MissingSurnames = new List<string>();
+        public static List<string> MissingMonasticTitlesDict = new List<string>();
         public static string translationpath = Path.Combine(BepInEx.Paths.PluginPath, "TaiwuETC", "Translations");
 
         public static Dictionary<string, string> FileToDictionary(string dir)
@@ -48,8 +51,8 @@ namespace TaiwuETC
 
                     if (!dict.ContainsKey(pair.Key))
                         dict.Add(pair.Key, pair.Value);
-                    else
-                        Debug.Log($"Found a duplicated line while parsing {dir}: {pair.Key}");
+                    //else
+                        //Debug.Log($"Found a duplicated line while parsing {dir}: {pair.Key}");
 
 
 
@@ -71,7 +74,9 @@ namespace TaiwuETC
                 Debug.Log(Path.Combine(Paths.GameRootPath, "Languages", "en"));
                 SurnamesDict = FileToDictionary("Surnames.txt");
                 NamesDict = FileToDictionary("Names.txt");
+                LocalMonasticTitlesDict = FileToDictionary("LocalMonasticTitles.txt");
                 translationDict = SurnamesDict.MergeLeft(NamesDict);
+                translationDict = translationDict.MergeLeft(LocalMonasticTitlesDict);
                 Debug.Log("Successfully Generated Dict");
             }
 
@@ -93,6 +98,7 @@ namespace TaiwuETC
             {
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingNames.txt"), String.Empty);
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingSurnames.txt"), String.Empty);
+                File.WriteAllText(Path.Combine(Main.translationpath, "MissingMonasticTitles.txt"), String.Empty);
                 foreach (string s in Main.MissingNames.Distinct())
                 {
                     using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingNames.txt")))
@@ -104,6 +110,16 @@ namespace TaiwuETC
                 foreach (string s in Main.MissingSurnames.Distinct())
                 {
                     using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingSurnames.txt")))
+                    {
+                        if (Helpers.IsChinese(s))
+                        {
+                            sw.Write(s);
+                        }
+                    }
+                }
+                foreach (string s in Main.MissingMonasticTitlesDict.Distinct())
+                {
+                    using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingMonasticTitles.txt")))
                     {
                         if (Helpers.IsChinese(s))
                         {
@@ -157,7 +173,7 @@ namespace TaiwuETC
             Debug.Log(__instance.Name);
         }
     }*/
-
+    /*
     [HarmonyPatch(typeof(LocalMonasticTitles), "Init")]
 
     static class LocalMonasticTitles_Patch
@@ -188,6 +204,7 @@ namespace TaiwuETC
             }
         }
     }
+    */
     [HarmonyPatch(typeof(LocalTownNames), "Init")]
 
     static class LocalTownNames_Patch
@@ -489,6 +506,49 @@ namespace TaiwuETC
         }
     }
 
+    [HarmonyPatch(typeof(LocalMonasticTitles), "Init")]
+
+    static class LocalMonasticTitles_Patch
+    {
+
+        static void Postfix(LocalMonasticTitles __instance)
+        {
+            foreach (MonasticTitleItem x in __instance.MonasticTitles)
+            {
+                try
+                {
+
+                    if (x.Name != null)
+                    {
+
+                        if (x.Name != "" && Main.translationDict.ContainsKey(x.Name))
+                        {
+                            Debug.Log("Found one MT ! : " + x.Name);
+                            FieldInfo fi = x.GetType().GetField("Name");
+                            //Slightly different patching method. Instead of patching the name display function, I'm directly adding a space before the Monastic Title **while** they are getting translated. May be a bit dangerous. Not sure.
+                            fi.SetValue(x, " " + Main.translationDict[x.Name]);
+                            Debug.Log("Modified MT = " + x.Name);
+                        }
+                        else
+                        {
+                            if (x.Name != null && x.Name != "")
+                            {
+                                Main.MissingMonasticTitlesDict.Add(x.Name);
+                            }
+                        }
+                    }
+                }
+
+                catch (Exception e)
+                {
+
+                }
+
+
+
+            }
+        }
+    }
 
     /*[HarmonyPatch(typeof(LocalStringManager), "Get", new Type[] { typeof(ushort)})]
     static class FullName_Patch
@@ -515,9 +575,32 @@ namespace TaiwuETC
     {
         static void Postfix(NameCenter __instance, ref ValueTuple<string, string> __result)
         {
+            if(__result.Item1 != null && __result.Item1 != "" && __result.Item2 != null && __result.Item2 != "")
+            { 
             __result.Item2 = " " + __result.Item2;
+            }
         }
     }
+
+    [HarmonyPatch(typeof(NameCenter), "GetMonasticTitle")]
+    static class NameCenter_Patch_03
+    {
+        static void Postfix(NameCenter __instance, ref NameRelatedData data, ref string __result)
+        {
+            if((data.MonkType & 128) > 0)
+            {
+                MonasticTitleItem[] config = LocalMonasticTitles.Instance.MonasticTitles;
+                string seniorityName = config[(int)data.MonasticTitle.SeniorityId].Name;
+                string suffixName = config[(int)data.MonasticTitle.SuffixId].Name;
+                OrganizationItem orgConfig = Organization.Instance[data.OrgTemplateId];
+                short orgMemberId = orgConfig.Members[(int)data.OrgGrade];
+                OrganizationMemberItem orgMemberConfig = OrganizationMember.Instance[orgMemberId];
+                string titleSuffix = orgMemberConfig.MonasticTitleSuffixes[(int)data.Gender];
+                __result = seniorityName + suffixName + " " + titleSuffix;
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(NameCenter), "HasInvalidCharForName")]
     static class REGEX_Patch
     {
@@ -531,16 +614,20 @@ namespace TaiwuETC
         }
     }
 
+
+
     [HarmonyPatch(typeof(FullName), "GetName")]
     static class FullName_GetName_Patch
     {
         static void Postfix(FullName __instance, ref ValueTuple<string, string> __result)
         {
 
+            if (__result.Item2.Length > 1)
+            {
                 __result.Item2 = __result.Item2.ToLower();
                 __result.Item2 = char.ToUpper(__result.Item2[0]) + __result.Item2.Substring(1);
                 //Debug.Log("Result.Item2 = " + __result.Item2);
-
+            }
         }
     }
 
