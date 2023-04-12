@@ -29,10 +29,12 @@ namespace TaiwuETC
         public static Dictionary<string, string> SurnamesDict;
         public static Dictionary<string, string> LocalMonasticTitlesDict;
         public static Dictionary<string, string> LocalTownNamesDict;
+        public static Dictionary<string, string> LocalZangNamesDict;
         public static List<string> MissingNames = new List<string>();
         public static List<string> MissingSurnames = new List<string>();
         public static List<string> MissingMonasticTitlesDict = new List<string>();
         public static List<string> MissingTownNames = new List<string>();
+        public static List<string> MissingZangNames = new List<string>();
         public static string translationpath = Path.Combine(BepInEx.Paths.PluginPath, "TaiwuETC", "Translations");
 
         public static Dictionary<string, string> FileToDictionary(string dir)
@@ -78,9 +80,11 @@ namespace TaiwuETC
                 NamesDict = FileToDictionary("Names.txt");
                 LocalMonasticTitlesDict = FileToDictionary("LocalMonasticTitles.txt");
                 LocalTownNamesDict = FileToDictionary("LocalTownNames.txt");
+                LocalZangNamesDict = FileToDictionary("LocalZangNames.txt");
                 translationDict = SurnamesDict.MergeLeft(NamesDict);
                 translationDict = translationDict.MergeLeft(LocalMonasticTitlesDict);
                 translationDict = translationDict.MergeLeft(LocalTownNamesDict);
+                translationDict = translationDict.MergeLeft(LocalZangNamesDict);
                 Debug.Log("Successfully Generated Dict");
             }
 
@@ -104,6 +108,7 @@ namespace TaiwuETC
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingSurnames.txt"), String.Empty);
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingMonasticTitles.txt"), String.Empty);
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingTownNames.txt"), String.Empty);
+                File.WriteAllText(Path.Combine(Main.translationpath, "MissingZangNames.txt"), String.Empty);
                 foreach (string s in Main.MissingNames.Distinct())
                 {
                     using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingNames.txt")))
@@ -135,6 +140,16 @@ namespace TaiwuETC
                 foreach (string s in Main.MissingTownNames.Distinct())
                 {
                     using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingTownNames.txt")))
+                    {
+                        if (Helpers.IsChinese(s))
+                        {
+                            sw.Write(s);
+                        }
+                    }
+                }
+                foreach (string s in Main.MissingZangNames.Distinct())
+                {
+                    using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingZangNames.txt")))
                     {
                         if (Helpers.IsChinese(s))
                         {
@@ -571,7 +586,49 @@ namespace TaiwuETC
             }
         }
     }
+    [HarmonyPatch(typeof(LocalZangNames), "Init")]
 
+    static class LocalZangNames_Patch
+    {
+
+        static void Postfix(LocalZangNames __instance)
+        {
+            foreach (ZangNameItem x in __instance.ZangNameCore)
+            {
+                try
+                {
+
+                    if (x.Name != null)
+                    {
+
+                        if (x.Name != "" && Main.translationDict.ContainsKey(x.Name))
+                        {
+                            //Debug.Log("Found one ZN ! : " + x.Name);
+                            FieldInfo fi = x.GetType().GetField("Name");
+                            //Slightly different patching method. Instead of patching the name display function, I'm directly adding a space before the Monastic Title **while** they are getting translated. May be a bit dangerous. Not sure.
+                            fi.SetValue(x, Main.translationDict[x.Name]);
+                            //Debug.Log("Modified ZN = " + x.Name);
+                        }
+                        else
+                        {
+                            if (x.Name != null && x.Name != "")
+                            {
+                                Main.MissingZangNames.Add(x.Name);
+                            }
+                        }
+                    }
+                }
+
+                catch (Exception e)
+                {
+
+                }
+
+
+
+            }
+        }
+    }
     /*[HarmonyPatch(typeof(LocalStringManager), "Get", new Type[] { typeof(ushort)})]
     static class FullName_Patch
     {
