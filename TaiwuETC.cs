@@ -28,9 +28,11 @@ namespace TaiwuETC
         public static Dictionary<string, string> NamesDict;
         public static Dictionary<string, string> SurnamesDict;
         public static Dictionary<string, string> LocalMonasticTitlesDict;
+        public static Dictionary<string, string> LocalTownNamesDict;
         public static List<string> MissingNames = new List<string>();
         public static List<string> MissingSurnames = new List<string>();
         public static List<string> MissingMonasticTitlesDict = new List<string>();
+        public static List<string> MissingTownNames = new List<string>();
         public static string translationpath = Path.Combine(BepInEx.Paths.PluginPath, "TaiwuETC", "Translations");
 
         public static Dictionary<string, string> FileToDictionary(string dir)
@@ -75,8 +77,10 @@ namespace TaiwuETC
                 SurnamesDict = FileToDictionary("Surnames.txt");
                 NamesDict = FileToDictionary("Names.txt");
                 LocalMonasticTitlesDict = FileToDictionary("LocalMonasticTitles.txt");
+                LocalTownNamesDict = FileToDictionary("LocalTownNames.txt");
                 translationDict = SurnamesDict.MergeLeft(NamesDict);
                 translationDict = translationDict.MergeLeft(LocalMonasticTitlesDict);
+                translationDict = translationDict.MergeLeft(LocalTownNamesDict);
                 Debug.Log("Successfully Generated Dict");
             }
 
@@ -99,6 +103,7 @@ namespace TaiwuETC
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingNames.txt"), String.Empty);
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingSurnames.txt"), String.Empty);
                 File.WriteAllText(Path.Combine(Main.translationpath, "MissingMonasticTitles.txt"), String.Empty);
+                File.WriteAllText(Path.Combine(Main.translationpath, "MissingTownNames.txt"), String.Empty);
                 foreach (string s in Main.MissingNames.Distinct())
                 {
                     using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingNames.txt")))
@@ -120,6 +125,16 @@ namespace TaiwuETC
                 foreach (string s in Main.MissingMonasticTitlesDict.Distinct())
                 {
                     using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingMonasticTitles.txt")))
+                    {
+                        if (Helpers.IsChinese(s))
+                        {
+                            sw.Write(s);
+                        }
+                    }
+                }
+                foreach (string s in Main.MissingTownNames.Distinct())
+                {
+                    using (StreamWriter sw = File.AppendText(Path.Combine(Main.translationpath, "MissingTownNames.txt")))
                     {
                         if (Helpers.IsChinese(s))
                         {
@@ -225,6 +240,13 @@ namespace TaiwuETC
                             FieldInfo fi = x.GetType().GetField("Name");
                             fi.SetValue(x, Main.translationDict[x.Name]);
                             //Debug.Log("Modified Name = " + x.Name);
+                        }
+                        else
+                        {
+                            if (x.Name != null && x.Name!= "")
+                            {
+                                Main.MissingTownNames.Add(x.Name);
+                            }
                         }
 
                     }
@@ -523,11 +545,11 @@ namespace TaiwuETC
 
                         if (x.Name != "" && Main.translationDict.ContainsKey(x.Name))
                         {
-                            Debug.Log("Found one MT ! : " + x.Name);
+                            //Debug.Log("Found one MT ! : " + x.Name);
                             FieldInfo fi = x.GetType().GetField("Name");
                             //Slightly different patching method. Instead of patching the name display function, I'm directly adding a space before the Monastic Title **while** they are getting translated. May be a bit dangerous. Not sure.
                             fi.SetValue(x, " " + Main.translationDict[x.Name]);
-                            Debug.Log("Modified MT = " + x.Name);
+                            //Debug.Log("Modified MT = " + x.Name);
                         }
                         else
                         {
@@ -626,7 +648,14 @@ namespace TaiwuETC
             {
                 __result.Item2 = __result.Item2.ToLower();
                 __result.Item2 = char.ToUpper(__result.Item2[0]) + __result.Item2.Substring(1);
-                //Debug.Log("Result.Item2 = " + __result.Item2);
+
+                Debug.Log("Result.Item1 = " + __result.Item1);
+
+                Debug.Log("Result.Item2 = " + __result.Item2);
+                if(__result.Item1 != null && !__result.Item1.EndsWith(" "))
+                {
+                    __result.Item1 = __result.Item1 + " ";
+                }
             }
         }
     }
