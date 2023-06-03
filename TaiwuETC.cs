@@ -1,23 +1,31 @@
 using BepInEx;
+using BepInEx.Unity.Mono;
 using Config;
 using GameData.Domains.Character;
 using GameData.Domains.Character.Display;
 using GameData.Domains.Global;
+using GameData.Domains.LifeRecord.GeneralRecord;
 using GameData.Domains.TaiwuEvent.DisplayEvent;
+using GameData.Domains.World;
 using HarmonyLib;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using TMPro;
+using UICommon.Character;
+using UILogic.DisplayDataStructure;
 using UnityEngine;
-using UnityEngine.Experimental.PlayerLoop;
-
+using UnityEngine.Assertions.Must;
+using static UnityEngine.UI.CanvasScaler;
 
 namespace TaiwuETC
 {
@@ -56,7 +64,7 @@ namespace TaiwuETC
                     if (!dict.ContainsKey(pair.Key))
                         dict.Add(pair.Key, pair.Value);
                     //else
-                        //Debug.Log($"Found a duplicated line while parsing {dir}: {pair.Key}");
+                    //Debug.Log($"Found a duplicated line while parsing {dir}: {pair.Key}");
 
 
 
@@ -194,6 +202,7 @@ namespace TaiwuETC
 
     }
 
+
     /*
     [HarmonyPatch(typeof(MonasticTitleItem), "MonasticTitleItem")]
     static class Patch01
@@ -203,8 +212,8 @@ namespace TaiwuETC
             Debug.Log(__instance.Name);
         }
     }*/
-    /*
-    [HarmonyPatch(typeof(LocalMonasticTitles), "Init")]
+
+    /*[HarmonyPatch(typeof(LocalMonasticTitles), "Init")]
 
     static class LocalMonasticTitles_Patch
     {
@@ -233,8 +242,8 @@ namespace TaiwuETC
                 }
             }
         }
-    }
-    */
+    }*/
+
     [HarmonyPatch(typeof(LocalTownNames), "Init")]
 
     static class LocalTownNames_Patch
@@ -258,7 +267,7 @@ namespace TaiwuETC
                         }
                         else
                         {
-                            if (x.Name != null && x.Name!= "")
+                            if (x.Name != null && x.Name != "")
                             {
                                 Main.MissingTownNames.Add(x.Name);
                             }
@@ -283,10 +292,10 @@ namespace TaiwuETC
             foreach (HanNameItem x in __instance.AllNamesCore)
             {
                 try
-                { 
-                if(x.MiddleChar != null)
+                {
+                    if (x.MiddleChar != null)
                     {
-                        if(Main.translationDict.ContainsKey(x.MiddleChar))
+                        if (Main.translationDict.ContainsKey(x.MiddleChar))
                         {
                             x.GetType().GetField("MiddleChar").SetValue(x, Main.translationDict[x.MiddleChar]);
                         }
@@ -295,203 +304,203 @@ namespace TaiwuETC
                             Main.MissingNames.Add(x.MiddleChar);
                         }
                     }
-                for (int i = 0; i < x.ApartMan.Count(); i++)
-                {
-                    if (x.ApartMan[i] != null)
+                    for (int i = 0; i < x.ApartMan.Count(); i++)
                     {
-                        var y = x.ApartMan[i];
-                        if (y != "" && Main.translationDict.ContainsKey(y))
+                        if (x.ApartMan[i] != null)
                         {
-
-                            FieldInfo fi = x.GetType().GetField("ApartMan");
-                            string[] value = (string[])fi.GetValue(x);
-                            for (int j = 0; j < value.Count(); j++)
+                            var y = x.ApartMan[i];
+                            if (y != "" && Main.translationDict.ContainsKey(y))
                             {
-                                if (Main.translationDict.ContainsKey(value[j]))
+
+                                FieldInfo fi = x.GetType().GetField("ApartMan");
+                                string[] value = (string[])fi.GetValue(x);
+                                for (int j = 0; j < value.Count(); j++)
                                 {
-                                    //Debug.Log("Found one Name ! : " + value[j]);
-                                    value[j] = Main.translationDict[value[j]];
-                                    //Debug.Log("Modified Name = " + value[j]);
+                                    if (Main.translationDict.ContainsKey(value[j]))
+                                    {
+                                        //Debug.Log("Found one Name ! : " + value[j]);
+                                        value[j] = Main.translationDict[value[j]];
+                                        //Debug.Log("Modified Name = " + value[j]);
+                                    }
                                 }
                             }
-                        }
-                        else
-                        {
-
-
-                            if (y != null && y != "")
+                            else
                             {
-                                Main.MissingNames.Add(y);
-                            }
 
+
+                                if (y != null && y != "")
+                                {
+                                    Main.MissingNames.Add(y);
+                                }
+
+                            }
                         }
                     }
-                }
 
-                for (int i = 0; i < x.ApartNeutral.Count(); i++)
-                {
-                    if (x.ApartNeutral[i] != null)
+                    for (int i = 0; i < x.ApartNeutral.Count(); i++)
                     {
-                        var y = x.ApartNeutral[i];
-                        if (y != "" && Main.translationDict.ContainsKey(y))
+                        if (x.ApartNeutral[i] != null)
                         {
-
-                            FieldInfo fi = x.GetType().GetField("ApartNeutral");
-                            string[] value = (string[])fi.GetValue(x);
-                            for (int j = 0; j < value.Count(); j++)
+                            var y = x.ApartNeutral[i];
+                            if (y != "" && Main.translationDict.ContainsKey(y))
                             {
-                                if (Main.translationDict.ContainsKey(value[j]))
+
+                                FieldInfo fi = x.GetType().GetField("ApartNeutral");
+                                string[] value = (string[])fi.GetValue(x);
+                                for (int j = 0; j < value.Count(); j++)
                                 {
-                                    //Debug.Log("Found one Name ! : " + value[j]);
-                                    value[j] = Main.translationDict[value[j]];
-                                    //Debug.Log("Modified Name = " + value[j]);
+                                    if (Main.translationDict.ContainsKey(value[j]))
+                                    {
+                                        //Debug.Log("Found one Name ! : " + value[j]);
+                                        value[j] = Main.translationDict[value[j]];
+                                        //Debug.Log("Modified Name = " + value[j]);
+                                    }
                                 }
                             }
-                        }
-                        else
-                        {
-
-
-                            if (y != null && y != "")
+                            else
                             {
-                                Main.MissingNames.Add(y);
-                            }
 
+
+                                if (y != null && y != "")
+                                {
+                                    Main.MissingNames.Add(y);
+                                }
+
+                            }
                         }
                     }
-                }
 
-                for (int i = 0; i < x.ApartWoman.Count(); i++)
-                {
-                    if (x.ApartWoman[i] != null)
+                    for (int i = 0; i < x.ApartWoman.Count(); i++)
                     {
-                        var y = x.ApartWoman[i];
-                        if (y != "" && Main.translationDict.ContainsKey(y))
+                        if (x.ApartWoman[i] != null)
                         {
-
-                            FieldInfo fi = x.GetType().GetField("ApartWoman");
-                            string[] value = (string[])fi.GetValue(x);
-                            for (int j = 0; j < value.Count(); j++)
+                            var y = x.ApartWoman[i];
+                            if (y != "" && Main.translationDict.ContainsKey(y))
                             {
-                                if (Main.translationDict.ContainsKey(value[j]))
+
+                                FieldInfo fi = x.GetType().GetField("ApartWoman");
+                                string[] value = (string[])fi.GetValue(x);
+                                for (int j = 0; j < value.Count(); j++)
                                 {
-                                    //Debug.Log("Found one Name ! : " + value[j]);
-                                    value[j] = Main.translationDict[value[j]];
-                                    //Debug.Log("Modified Name = " + value[j]);
+                                    if (Main.translationDict.ContainsKey(value[j]))
+                                    {
+                                        //Debug.Log("Found one Name ! : " + value[j]);
+                                        value[j] = Main.translationDict[value[j]];
+                                        //Debug.Log("Modified Name = " + value[j]);
+                                    }
                                 }
                             }
-                        }
-                        else
-                        {
-
-
-                            if (y != null && y != "")
+                            else
                             {
-                                Main.MissingNames.Add(y);
-                            }
 
+
+                                if (y != null && y != "")
+                                {
+                                    Main.MissingNames.Add(y);
+                                }
+
+                            }
                         }
                     }
-                }
 
-                for (int i = 0; i < x.SerialMan.Count(); i++)
-                {
-                    if (x.SerialMan[i] != null)
+                    for (int i = 0; i < x.SerialMan.Count(); i++)
                     {
-                        var y = x.SerialMan[i];
-                        if (y != "" && Main.translationDict.ContainsKey(y))
+                        if (x.SerialMan[i] != null)
                         {
-
-                            FieldInfo fi = x.GetType().GetField("SerialMan");
-                            string[] value = (string[])fi.GetValue(x);
-                            for (int j = 0; j < value.Count(); j++)
+                            var y = x.SerialMan[i];
+                            if (y != "" && Main.translationDict.ContainsKey(y))
                             {
-                                if (Main.translationDict.ContainsKey(value[j]))
+
+                                FieldInfo fi = x.GetType().GetField("SerialMan");
+                                string[] value = (string[])fi.GetValue(x);
+                                for (int j = 0; j < value.Count(); j++)
                                 {
-                                    //Debug.Log("Found one Name ! : " + value[j]);
-                                    value[j] = Main.translationDict[value[j]];
-                                    //Debug.Log("Modified Name = " + value[j]);
+                                    if (Main.translationDict.ContainsKey(value[j]))
+                                    {
+                                        //Debug.Log("Found one Name ! : " + value[j]);
+                                        value[j] = Main.translationDict[value[j]];
+                                        //Debug.Log("Modified Name = " + value[j]);
+                                    }
                                 }
                             }
-                        }
-                        else
-                        {
-
-
-                            if (y != null && y != "")
+                            else
                             {
-                                Main.MissingNames.Add(y);
-                            }
 
+
+                                if (y != null && y != "")
+                                {
+                                    Main.MissingNames.Add(y);
+                                }
+
+                            }
                         }
                     }
-                }
 
-                for (int i = 0; i < x.SerialNeutral.Count(); i++)
-                {
-                    if (x.SerialNeutral[i] != null)
+                    for (int i = 0; i < x.SerialNeutral.Count(); i++)
                     {
-                        var y = x.SerialNeutral[i];
-                        if (y != "" && Main.translationDict.ContainsKey(y))
+                        if (x.SerialNeutral[i] != null)
                         {
-
-                            FieldInfo fi = x.GetType().GetField("SerialNeutral");
-                            string[] value = (string[])fi.GetValue(x);
-                            for (int j = 0; j < value.Count(); j++)
+                            var y = x.SerialNeutral[i];
+                            if (y != "" && Main.translationDict.ContainsKey(y))
                             {
-                                if (Main.translationDict.ContainsKey(value[j]))
+
+                                FieldInfo fi = x.GetType().GetField("SerialNeutral");
+                                string[] value = (string[])fi.GetValue(x);
+                                for (int j = 0; j < value.Count(); j++)
                                 {
-                                    //Debug.Log("Found one Name ! : " + value[j]);
-                                    value[j] = Main.translationDict[value[j]];
-                                   //Debug.Log("Modified Name = " + value[j]);
+                                    if (Main.translationDict.ContainsKey(value[j]))
+                                    {
+                                        //Debug.Log("Found one Name ! : " + value[j]);
+                                        value[j] = Main.translationDict[value[j]];
+                                        //Debug.Log("Modified Name = " + value[j]);
+                                    }
                                 }
                             }
-                        }
-                        else
-                        {
-
-
-                            if (y != null && y != "")
+                            else
                             {
-                                Main.MissingNames.Add(y);
-                            }
 
+
+                                if (y != null && y != "")
+                                {
+                                    Main.MissingNames.Add(y);
+                                }
+
+                            }
                         }
                     }
-                }
 
-                for (int i = 0; i < x.SerialWoman.Count(); i++)
-                {
-                    if (x.SerialWoman[i] != null)
+                    for (int i = 0; i < x.SerialWoman.Count(); i++)
                     {
-                        var y = x.SerialWoman[i];
-                        if (y != "" && Main.translationDict.ContainsKey(y))
+                        if (x.SerialWoman[i] != null)
                         {
-
-                            FieldInfo fi = x.GetType().GetField("SerialWoman");
-                            string[] value = (string[])fi.GetValue(x);
-                            for (int j = 0; j < value.Count(); j++)
+                            var y = x.SerialWoman[i];
+                            if (y != "" && Main.translationDict.ContainsKey(y))
                             {
-                                if (Main.translationDict.ContainsKey(value[j]))
+
+                                FieldInfo fi = x.GetType().GetField("SerialWoman");
+                                string[] value = (string[])fi.GetValue(x);
+                                for (int j = 0; j < value.Count(); j++)
                                 {
-                                    //Debug.Log("Found one Name ! : " + value[j]);
-                                    value[j] = Main.translationDict[value[j]];
-                                    //Debug.Log("Modified Name = " + value[j]);
+                                    if (Main.translationDict.ContainsKey(value[j]))
+                                    {
+                                        //Debug.Log("Found one Name ! : " + value[j]);
+                                        value[j] = Main.translationDict[value[j]];
+                                        //Debug.Log("Modified Name = " + value[j]);
+                                    }
                                 }
                             }
-                        }
-                        else
-                        {
-
-
-                            if (y != null && y != "")
+                            else
                             {
-                                Main.MissingNames.Add(y);
-                            }
 
+
+                                if (y != null && y != "")
+                                {
+                                    Main.MissingNames.Add(y);
+                                }
+
+                            }
                         }
                     }
-                }
 
                 }
                 catch
@@ -629,44 +638,36 @@ namespace TaiwuETC
             }
         }
     }
-    /*[HarmonyPatch(typeof(LocalStringManager), "Get", new Type[] { typeof(ushort)})]
+    [HarmonyPatch(typeof(LocalStringManager), "Get", new Type[] { typeof(ushort) })]
     static class FullName_Patch
     {
         static void Postfix(LocalStringManager __instance, ref ushort id, ref string __result)
         {
-            if(__result == "Taiwu")
+            if (__result == "Taiwu")
             {
                 __result = "Taiwu ";
             }
         }
-    }*/
-    /*[HarmonyPatch(typeof(NameCenter), "GetMonasticTitleOrName")]
+    }
+
+
+    [HarmonyPatch(typeof(NameCenter), "GetMonasticTitleOrName")]
     static class NameCenter_Patch_01
     {
         static void Postfix(NameCenter __instance, ref ValueTuple<string, string> __result)
         {
             __result.Item2 = " " + __result.Item2;
         }
-    }*/
-
-    [HarmonyPatch(typeof(NameCenter), "GetName")]
-    static class NameCenter_Patch_02
-    {
-        static void Postfix(NameCenter __instance, ref ValueTuple<string, string> __result)
-        {
-            if(__result.Item1 != null && __result.Item1 != "" && __result.Item2 != null && __result.Item2 != "")
-            { 
-            __result.Item2 = " " + __result.Item2;
-            }
-        }
     }
 
+
+
     [HarmonyPatch(typeof(NameCenter), "GetMonasticTitle")]
-    static class NameCenter_Patch_03
+    static class NameCenter_Patch_02
     {
         static void Postfix(NameCenter __instance, ref NameRelatedData data, ref string __result)
         {
-            if((data.MonkType & 128) > 0)
+            if ((data.MonkType & 128) > 0)
             {
                 MonasticTitleItem[] config = LocalMonasticTitles.Instance.MonasticTitles;
                 string seniorityName = config[(int)data.MonasticTitle.SeniorityId].Name;
@@ -680,10 +681,158 @@ namespace TaiwuETC
         }
     }
 
+    [HarmonyPatch(typeof(NameCenter), "GetCharMonasticTitleAndNameByDisplayData")]
+    static class NameCenter_Patch_03
+    {
+        static void Postfix(NameCenter __instance, ref string __result)
+        {
+            Debug.Log("Patch 3 : " + __result);
+        }
+    }
+
+    [HarmonyPatch(typeof(NameCenter), "GetCharMonasticTitleAndNameByNameRelatedData")]
+    static class NameCenter_Patch_04
+    {
+        public static string FirstCharToUpper(this string input)
+        {
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+        }
+
+        public static string[] SplitCamelCase(string source)
+        {
+            return Regex.Split(source, @"(?<!^)(?=[A-Z])");
+        }
+        static void Postfix(NameCenter __instance, ref string __result)
+        {
+            //Debug.Log("Patch 4 : " + __result);
+            var scc = SplitCamelCase(__result);
+            __result = __result.Replace(scc.FirstOrDefault(), scc.FirstOrDefault() + " ");
+            var array = __result.Split();
+            if (array.Count() == 2)
+            {
+                array[1] = FirstCharToUpper(array[1]);
+                __result = array[0] + " " + array[1];
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(NameCenter), "GetCharMonasticTitleOrNameByDisplayData")]
+    static class NameCenter_Patch_05
+    {
+        public static string FirstCharToUpper(this string input)
+        {
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+        }
+        static void Postfix(NameCenter __instance, ref string __result)
+        {
+            //Debug.Log("Patch 5 : " + __result);
+            var array = __result.Split();
+            if(array.Count() == 2)
+            { 
+            array[1] = FirstCharToUpper(array[1]);
+            __result = array[0] + " " + array[1];
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(NameCenter), "GetName")]
+    static class NameCenter_Patch_06
+    {
+        public static string FirstCharToUpper(this string input)
+        {
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+        }
+        static void Postfix(NameCenter __instance, ValueTuple<string,string> __result)
+        {
+            //Debug.Log("Patch 6 : " + __result.Item1 + " + " + __result.Item2);
+            if(!__result.Item1.EndsWith(" "))
+            {
+                __result.Item1 = __result.Item1 + " ";
+            }
+            __result.Item2 = FirstCharToUpper(__result.Item2);
+            __result = new ValueTuple<string, string>(__result.Item1, __result.Item2);
+            //Debug.Log("Patch 6 after : " + __result.Item1 + " + " + __result.Item2);
+        }
+    }
+
+    [HarmonyPatch(typeof(NameCenter), "GetNameByDisplayData")]
+    static class NameCenter_Patch_7
+    {
+        static void Postfix(NameCenter __instance, ref string __result)
+        {
+            Debug.Log("Patch 7 : " + __result);
+        }
+    }
+
+    [HarmonyPatch(typeof(NotificationItem), "GetFillParams")]
+    static class NotificationItem_Patch
+    {
+        public static string FirstCharToUpper(this string input)
+        {
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+        }
+        static void Postfix(NotificationItem __instance, ref object[] __result)
+        {
+            for(int i = 0; i < __result.Count(); i++) 
+            {
+                Regex rx = new Regex(@"\b[A-Z]+[a-z]+[A-Z]+[a-z]+\b");
+                if (__result[i].ToString().Contains("link"))
+                {
+                    //Debug.Log("__result[i].ToString() : " + __result[i].ToString());
+
+                    var str = __result[i].ToString();
+                    var MatchCollection = rx.Matches(str);
+                    foreach(var match in MatchCollection)
+                    {
+                        //Debug.Log("match : " + match.ToString());
+
+                        __result[i] = __result[i].ToString().Replace(match.ToString(), FirstCharToUpper(match.ToString()));
+                    }
+                }
+                
+            }
+        }
+    }
+
+    /*[HarmonyPatch(typeof(string), "Concat", new Type[] {typeof(string), typeof(string) })]
+    static class Patch_String
+    {
+        public static string FirstCharToUpper(this string input)
+        {
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+        }
+        static void Prefix(ref string str0, ref string str1, ref string __result)
+        {
+            if (Main.SurnamesDict.ContainsValue(str0))
+            {
+                if (!str0.Contains(" "))
+                {
+
+                    Debug.Log("Surn Case concat2 - str0 : " + str0);
+                    Debug.Log("Surn Case concat2 - str1 : " + str1);
+                    if (!str1.StartsWith(" "))
+                    {
+                        str0 = str0 + " ";
+
+                    }
+                    Debug.Log("Surn Before str1 : " + str1);
+                    str1.Replace(" ", "");
+                    Debug.Log("Surn First char ? " + str1[0]);
+                    str1 = FirstCharToUpper(str1);
+                    Debug.Log("Surn After str1 : " + str1);
+                }
+            }
+
+
+
+        }
+
+    }*/
+
     [HarmonyPatch(typeof(NameCenter), "HasInvalidCharForName")]
     static class REGEX_Patch
     {
-        static void Postfix(ref string nameString, ref bool __result )
+        static void Postfix(ref string nameString, ref bool __result)
         {
 
             //Debug.Log("NameString = " + nameString);
@@ -695,48 +844,47 @@ namespace TaiwuETC
 
 
 
-    [HarmonyPatch(typeof(FullName), "GetName")]
-    static class FullName_GetName_Patch
-    {
-        static void Postfix(FullName __instance, ref ValueTuple<string, string> __result)
-        {
 
-            if (__result.Item2.Length > 1)
-            {
-                __result.Item2 = __result.Item2.ToLower();
-                __result.Item2 = char.ToUpper(__result.Item2[0]) + __result.Item2.Substring(1);
-
-                Debug.Log("Result.Item1 = " + __result.Item1);
-
-                Debug.Log("Result.Item2 = " + __result.Item2);
-                if(__result.Item1 != null && !__result.Item1.EndsWith(" "))
-                {
-                    __result.Item1 = __result.Item1 + " ";
-                }
-            }
-        }
-    }
 
     [HarmonyPatch(typeof(WorldInfo), "Deserialize")]
     static class WorldInfo_GetSerializedSize_Patch
     {
         static void Postfix(WorldInfo __instance)
         {
-            Debug.Log("TGN before = " +__instance.TaiwuGivenName);
-            __instance.TaiwuGivenName = " " + __instance.TaiwuGivenName;
-            Debug.Log("TGN after = " + __instance.TaiwuGivenName);
+            //Debug.Log("__instance.TaiwuGivenName : \"" + __instance.TaiwuGivenName + "\"");
+            //Debug.Log("__instance.TaiwuSurname : \"" + __instance.TaiwuSurname + "\"");
+            if (!__instance.TaiwuSurname.EndsWith(" ") && !__instance.TaiwuGivenName.StartsWith(" "))
+            {
+                __instance.TaiwuSurname = __instance.TaiwuSurname + " ";
+
+                if (__instance.TaiwuGivenName.Length > 1)
+                {
+                    var firstletter = char.ToUpper(__instance.TaiwuGivenName[0]);
+                    //Debug.Log("First Letter : " + firstletter);
+                    var rest = __instance.TaiwuGivenName.Substring(1).ToLower();
+                    //Debug.Log("Rest : " + rest);
+                    __instance.TaiwuGivenName = String.Concat(firstletter, rest);
+                }
+
+            }
+            //Debug.Log("__instance.TaiwuGivenName 2 : \"" + __instance.TaiwuGivenName + "\"");
+            //Debug.Log("__instance.TaiwuSurname 2 : \"" + __instance.TaiwuSurname + "\"");
         }
+
+
     }
+
 
     [HarmonyPatch(typeof(EventModel), "GetOptionConditionContent")]
     static class EventModel_Patch
     {
 
-    static void Postfix(EventModel __instance, ref string __result, ref short index)
+        static void Postfix(EventModel __instance, ref string __result, ref short index)
         {
-            string[] hello = new string[]{};
+            string[] hello = new string[] { };
             string optionAvailableLanguageFileName = "EventOptionTips_" + LocalStringManager.CurLanguageKey;
-            var lines  = File.ReadAllLines(Path.Combine(Paths.GameRootPath, "Languages", "en", "EventOptionTips_CN.txt"));
+
+            var lines = File.ReadAllLines(Path.Combine("Languages", "en", "EventOptionTips_CN.txt"));
             string filePath = Path.Combine("RemakeResources/Data/Language_EventOptionTips", optionAvailableLanguageFileName);
             ResLoader.Load<TextAsset>(filePath, delegate (TextAsset asset)
             {
@@ -748,11 +896,11 @@ namespace TaiwuETC
 
 
 
-            if(hello.Count() == lines.Count() + 1)
+            if (hello.Count() == lines.Count() + 1)
             {
-                for(int i = 0; i< lines.Count(); i++)
+                for (int i = 0; i < lines.Count(); i++)
                 {
-                    if(__result == hello[i])
+                    if (__result == hello[i])
                     {
                         Debug.Log("Original String = " + __result);
                         __result = lines[i];
@@ -780,7 +928,49 @@ namespace TaiwuETC
         static void Postfix(TMP_InputField __instance, ref int __result)
         {
 
-            __result = __result + 6;
+            __result = __result + 7;
+        }
+    }
+    [HarmonyPatch(typeof(TaiwuEventDisplayData), "Deserialize")]
+    static class Patch_Event_Names
+    {
+        public static string FirstCharToUpper(this string input)
+        {
+            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+        }
+        public static string[] SplitCamelCase(string source)
+        {
+            return Regex.Split(source, @"(?<!^)(?=[A-Z])");
+        }
+        static void Postfix(TaiwuEventDisplayData __instance)
+        {
+
+            Regex rx = new Regex(@"([A-Z]{1,}[a-z]+){2,}");
+
+            if (!__instance.EventContent.IsNullOrEmpty())
+            {
+                //Debug.Log("EDN : " + __instance.EventContent);
+                var str = __instance.EventContent;
+                var MatchCollection = rx.Matches(str);
+                if(MatchCollection.Count > 0)
+                { 
+                foreach (var match in MatchCollection)
+                {
+                        StringBuilder rest = new StringBuilder();
+                        //Debug.Log("Match : " + match.ToString());
+                    var arr = SplitCamelCase(match.ToString());
+                    for(int i = 1; i < arr.Length; i++)
+                        {
+                            rest.Append(arr[i]);
+                        }
+                    __instance.EventContent = __instance.EventContent.Replace(match.ToString(), FirstCharToUpper(arr[0]) + " " + FirstCharToUpper(rest.ToString()));
+
+                    //Debug.Log("Final : " + __instance.EventContent);
+
+                    }
+                }
+
+            }
         }
     }
     public static class DictionaryExtensions
@@ -813,7 +1003,7 @@ namespace TaiwuETC
         }
 
     }
-     public static class Helpers
+    public static class Helpers
     {
         public static readonly Regex cjkCharRegex = new Regex(@"\p{IsCJKUnifiedIdeographs}");
         public static bool IsChinese(string s)
