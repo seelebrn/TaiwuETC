@@ -744,14 +744,21 @@ namespace TaiwuETC
         }
         static void Postfix(NameCenter __instance, ValueTuple<string,string> __result)
         {
+            if(__result.Item1 != null)
+            { 
             //Debug.Log("Patch 6 : " + __result.Item1 + " + " + __result.Item2);
             if(!__result.Item1.EndsWith(" "))
             {
                 __result.Item1 = __result.Item1 + " ";
             }
+            }
+            if(__result.Item2 != null && __result.Item2.Length > 1)
+            { 
             __result.Item2 = FirstCharToUpper(__result.Item2);
+                //Debug.Log("Patch 6 after : " + __result.Item1 + " + " + __result.Item2);
+            }
             __result = new ValueTuple<string, string>(__result.Item1, __result.Item2);
-            //Debug.Log("Patch 6 after : " + __result.Item1 + " + " + __result.Item2);
+
         }
     }
 
